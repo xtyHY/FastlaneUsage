@@ -1,0 +1,17 @@
+
+
+# 使用for_lane方式
+# 默认AppStore
+app_identifier "com.devhy.testStore"
+apple_id "devhy@xxxx2.com"
+team_id "TEAMIDXXX2"
+
+# 某个lane单独修改，比如打企业包
+for_lane :ent do
+    app_identifier "com.devhy.testEnt"
+    apple_id "devhy@xxxx1.com"
+    team_id "TEAMIDXXX1"
+end
+
+# # you can even provide different app identifiers, Apple IDs and team names per lane:
+# # More information: https://github.com/fastlane/fastlane/blob/master/fastlane/docs/Appfile.md

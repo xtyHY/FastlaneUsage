@@ -1,0 +1,113 @@
+# [fastlane基本介绍] [文档地址](https://docs.fastlane.tools/)
+# fastlane的语法高亮为ruby
+# fastlane中每一个lane都是一个打包的过程方式
+# 其他的before_all after_all error 是会应用于所有lane的
+# 所有的操作可以通过在命令行中执行fastlane actions来罗列
+# fastlane还可以调用shell脚本，使用 sh "xxxx.sh"
+
+# 因为fastlane存在新老版本兼容问题，所以一般会指定fastlane版本
+
+# 使用方法：
+# fastlane ent
+# fastlane store
+# fastlane adhoc
+
+fastlane_version "2.62.0"
+# 默认平台
+default_platform :ios
+# 根据平台做啥
+platform :ios do 
+  # 所有lane执行之前
+  before_all do |lane, options|
+    cocoapods
+  end
+
+  # 打一个企业版包
+  lane :ent do |options|
+    # action(cert)，下载[开发者证书.cer]
+    # 下载的文件会存在项目根目录的build文件夹下
+    # 若工程目录没有 [含有开发者账号的keychain备份] 或者 [使用后登录失败]，
+    # fastlane会让你在命令行登录开发者账号，登录成功后，会在你的[钥匙串]中创建一个 {deliver.[username]} 的登录账户
+    cert(
+      # Appfile设置了这边就可以不用了
+      # username: "com.devhy.testEnt",
+      # team_id: "TEAMIDXXX1",
+
+      # 下载文件的位置
+      output_path: "build",
+    )
+
+    # action(sigh)，下载[安装app匹配的Provision Profile文件(PP文件)]
+    # 但是建议自己去苹果开发者网站证书中手动处理一波provision_profile
+    # 建议用 bundleId_导出方式 来命名比如: 
+    #     卖好车的企业包pp文件叫 testEnt_InHouse.mobileprovision
+    sigh(
+      # Appfile设置了这边就可以不用了
+      # app_identifier: "com.devhy.testEnt",
+      # username: "devhy@xxxx1.com",
+      # team_id: "TEAMIDXXX1",
+
+      # 下载文件的位置
+      output_path: "build",
+      # 自动下载签名时，adc里pp名字，貌似只会下载最新的那一个
+      # provisioning_name: "testEnt_InHouse", 
+      # 仅下载不创建
+      readonly: true, 
+      # 因为是根据BundleID下载，导致adhoc和appstore会优先appstore，导致最后导出报错
+      adhoc: false, 
+    )
+
+    # 编译配置，编译的scheme，导出包方式，对应的provision_profile名称
+    gym(
+      scheme: "HYTestEnt",
+      # app-store, ad-hoc, package, enterprise, development, developer-id
+      export_method: "enterprise", 
+      # 输出日志的目录
+      buildlog_path: "fastlanelog",
+      # 输出编译结果
+      output_directory: "build",
+      include_bitcode: false,
+    )
+  end
+
+  # 打appstore的lane
+  lane :store do
+    cert(output_path: "build",)
+
+    sigh(output_path: "build", readonly: true, adhoc: false,)
+
+    gym(
+      scheme: "HYTest",
+      export_method: "app-store", 
+      buildlog_path: "fastlanelog",
+      output_directory: "build",
+      include_bitcode: false,
+    )
+  end
+
+  # 打adhoc的lane
+  lane :adhoc do
+    cert(output_path: "build",)
+
+    sigh(output_path: "build", readonly: true, adhoc: true,)
+
+    gym(
+      scheme: "HYTest",
+      export_method: "ad-hoc", 
+      buildlog_path: "fastlanelog",
+      output_directory: "build",
+      include_bitcode: false,
+    )
+  end
+
+  # 所有lane完成之后，可以适用参数lane来区分
+  after_all do |lane|
+
+  end
+
+  # 所有lane失败之后，可以适用参数lane来区分
+  error do |lane, exception|
+
+  end
+
+end

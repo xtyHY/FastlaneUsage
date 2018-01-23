@@ -1,0 +1,139 @@
+# [fastlane基本介绍] [文档地址](https://docs.fastlane.tools/)
+# fastlane的语法高亮为ruby
+# fastlane中每一个lane都是一个打包的过程方式
+# 其他的before_all after_all error 是会应用于所有lane的
+# 所有的操作可以通过在命令行中执行fastlane actions来罗列
+# fastlane还可以调用shell脚本，使用 sh "xxxx.sh"
+
+# 因为fastlane存在新老版本兼容问题，所以一般会指定fastlane版本
+
+# 使用方法：
+# fastlane ent --env ent build:debug
+# fastlane store --env store build:release
+# fastlane store --env store build:adhoc
+
+fastlane_version "2.62.0"
+# 默认平台
+default_platform :ios
+# 根据平台做啥
+platform :ios do 
+  # 所有lane执行之前
+
+  # 相当于全局变量
+  build_config = "debug"
+  is_adhoc     = false
+
+  before_all do |lane, options|
+    if lane != :do_upload
+      sh "rm -rf ../build"
+    end
+
+    # 执行一下pod install
+    cocoapods
+
+    # 传递一下启动的lane名字
+    options[:lane_name] = lane.to_s
+
+    # 处理一下options参数
+    deal_input_param options
+  end
+
+  # 打企业包
+  lane :ent do |options|
+    # action(cert)，下载[开发者证书.cer]
+    # 下载的文件会存在项目根目录的build文件夹下
+    # 若工程目录没有 [含有开发者账号的keychain备份] 或者 [使用后登录失败]，
+    # fastlane会让你在命令行登录开发者账号，登录成功后，会在你的[钥匙串]中创建一个 {deliver.[username]} 的登录账户
+    cert(
+      # Appfile设置了这边就可以不用了
+      # username: "com.devhy.testEnt",
+      # team_id: "TEAMIDXXX1",
+
+      # 下载文件的位置
+      output_path: "build",
+    )
+
+    # action(sigh)，下载[安装app匹配的Provision Profile文件(PP文件)]
+    # 但是建议自己去苹果开发者网站证书中手动处理一波provision_profile
+    # 建议用 bundleId_导出方式 来命名比如: 
+    #     卖好车的企业包pp文件叫 MHCB2BApp1_InHouse.mobileprovision
+    sigh(
+      # Appfile设置了这边就可以不用了
+      # app_identifier: "com.devhy.testEnt",
+      # username: "devhy@xxxx1.com",
+      # team_id: "TEAMIDXXX1",
+
+      # 下载文件的位置
+      output_path: "build",
+      # 自动下载签名时，adc里pp名字，貌似只会下载最新的那一个
+      # provisioning_name: "MHCB2BApp1_InHouse", 
+      # 仅下载不创建
+      readonly: true, 
+      # 因为是根据BundleID下载，导致adhoc和appstore会优先appstore，导致最后导出报错
+      adhoc: false, 
+    )
+
+    # 编译配置，编译的scheme，导出包方式，对应的provision_profile名称
+    gym(
+      # 使用环境变量传递
+      scheme: ENV['Scheme'],
+      # app-store, ad-hoc, package, enterprise, development, developer-id
+      export_method: "enterprise", 
+      # 输出日志的目录
+      buildlog_path: "fastlanelog",
+      # 输出编译结果
+      output_directory: "build",
+      include_bitcode: false,
+      # 设置编译
+      configuration: build_config,
+    )
+  end
+
+  # 打appstore or adhoc的lane
+  lane :store do
+    cert(output_path: "build",)
+
+    sigh(output_path: "build", readonly: true, adhoc: is_adhoc,)
+
+    gym(
+      scheme: ENV['Scheme'],
+      export_method: is_adhoc ? "ad-hoc" : "app-store", 
+      buildlog_path: "fastlanelog",
+      output_directory: "build",
+      include_bitcode: false,
+      configuration: build_config,
+    )
+  end
+
+  # 所有lane完成之后，可以适用参数lane来区分
+  after_all do |lane|
+
+  end
+
+  # 所有lane失败之后，可以适用参数lane来区分
+  error do |lane, exception|
+
+  end
+
+  # 启动参数配置
+  private_lane :deal_input_param do |options|
+    puts "-------启动参数-------"
+    puts options
+
+    # 判空一下，直接转换成大写开头
+    build_config = options[:build]
+    lane_name    = options[:lane_name]
+    
+    build_config = build_config ? build_config : "debug"
+    build_config.capitalize!
+
+    # lane这个参数是和下面声明的:ent相等的对象
+    if lane_name == "store"
+      is_adhoc     = build_config=="Debug" or build_config=="adhoc" ? true : false
+      build_config = build_config=="Adhoc" ? "Release" : build_config
+    end
+
+    puts build_config
+  end
+
+end
